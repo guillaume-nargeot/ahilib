@@ -1,15 +1,13 @@
 package com.github.guillaumenargeot.ahilib.proxy;
 
-import com.google.common.util.concurrent.Futures;
 import org.junit.Test;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 import static com.github.guillaumenargeot.ahilib.proxy.Synchronous.synchronously;
 import static com.google.common.reflect.Reflection.newProxy;
-import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -17,20 +15,25 @@ public final class SynchronousTest {
 
     @Test
     public void test() {
-        final String futureResult = "result";
+        final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
         @SuppressWarnings("unchecked")
         final FutureSupplier<String> futureSupplier = newProxy(FutureSupplier.class, new InvocationHandler() {
             @Override
-            public Object invoke(Object o, Method method, Object[] objects) throws Throwable {
-                return Futures.immediateFuture(futureResult);
+            public Object invoke(final Object target, final Method method, final Object... args) throws Throwable {
+                return executorService.schedule(new Callable<Object>() {
+                    @Override
+                    public Object call() throws Exception {
+                        return "";
+                    }
+                }, 100, TimeUnit.MILLISECONDS);
             }
         });
 
         final Future<String> resultFuture = synchronously(futureSupplier).get();
-        final String result = Futures.getUnchecked(resultFuture);
+        // no need to call get() on the future in order to wait for the result
 
-        assertThat(result, is(equalTo(futureResult)));
+        assertThat(resultFuture.isDone(), is(true));
     }
 
     private interface FutureSupplier<T> {

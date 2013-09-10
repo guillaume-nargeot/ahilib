@@ -1,5 +1,7 @@
 package com.github.guillaumenargeot.ahilib.proxy;
 
+import com.google.common.util.concurrent.Futures;
+
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -35,15 +37,19 @@ public final class Synchronous {
         }
 
         @Override
-        public Object invoke(Object proxy, Method method, Object[] objects) throws Throwable {
+        public Object invoke(Object proxy, Method method, Object... args) throws Throwable {
             if (!method.getReturnType().equals(Future.class)) {
                 throw new UnsupportedOperationException("");
             }
+            final Future<T> futureResult;
             try {
-                return method.invoke(asynchronousProxy, objects);
+                //noinspection unchecked
+                futureResult = (Future<T>) method.invoke(asynchronousProxy, args);
             } catch (InvocationTargetException e) {
                 throw e.getTargetException();
             }
+            final T result = Futures.getUnchecked(futureResult);
+            return Futures.immediateFuture(result);
         }
     }
 }
