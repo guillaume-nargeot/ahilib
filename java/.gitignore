@@ -1,2 +1,5 @@
 #dependencies
 lib/
+
+#intellij
+.idea/
