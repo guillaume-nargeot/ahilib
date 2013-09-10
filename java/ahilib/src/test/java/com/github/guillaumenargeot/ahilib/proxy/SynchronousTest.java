@@ -17,26 +17,25 @@ public final class SynchronousTest {
     public void test() {
         final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
-        @SuppressWarnings("unchecked")
-        final FutureSupplier<String> futureSupplier = newProxy(FutureSupplier.class, new InvocationHandler() {
+        final FutureTask futureSupplier = newProxy(FutureTask.class, new InvocationHandler() {
             @Override
             public Object invoke(final Object target, final Method method, final Object... args) throws Throwable {
-                return executorService.schedule(new Callable<Object>() {
+                return executorService.schedule(new Callable<Void>() {
                     @Override
-                    public Object call() throws Exception {
-                        return "";
+                    public Void call() throws Exception {
+                        return null;
                     }
                 }, 100, TimeUnit.MILLISECONDS);
             }
         });
 
-        final Future<String> resultFuture = synchronously(futureSupplier).get();
-        // no need to call get() on the future in order to wait for the result
+        final Future<Void> resultFuture = synchronously(futureSupplier).run();
+        // no need to block and wait for the result explicitly
 
         assertThat(resultFuture.isDone(), is(true));
     }
 
-    private interface FutureSupplier<T> {
-        Future<T> get();
+    private interface FutureTask {
+        Future<Void> run();
     }
 }
