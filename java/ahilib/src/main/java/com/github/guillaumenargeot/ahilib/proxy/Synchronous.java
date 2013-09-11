@@ -19,36 +19,59 @@ public final class Synchronous {
     public static <T> T synchronously(final T asynchronousProxy) {
         checkNotNull(asynchronousProxy);
         checkArgument(Proxy.isProxyClass(asynchronousProxy.getClass()), "asynchronousProxy must be an instance of Proxy");
-        final Class<?>[] proxyInterfaces = asynchronousProxy.getClass().getInterfaces();
-        //noinspection unchecked
-        return (T) Proxy.newProxyInstance(
-                asynchronousProxy.getClass().getClassLoader(),
-                proxyInterfaces,
-                new SynchronousInvocationHandler<T>(asynchronousProxy)
-        );
+        checkArgument(hasFutureResultMethods(asynchronousProxy), "asynchronousProxy must provide methods of Future return type");
+        final Class proxyClass = asynchronousProxy.getClass();
+        final ClassLoader classLoader = proxyClass.getClassLoader();
+        final Class[] proxyInterfaces = proxyClass.getInterfaces();
+        return unsafeCreateProxy(asynchronousProxy, classLoader, proxyInterfaces);
     }
 
-    private static final class SynchronousInvocationHandler<T> implements InvocationHandler {
+    private static boolean hasFutureResultMethods(final Object object) {
+        for (final Class interfaceClass : object.getClass().getInterfaces()) {
+            if (hashFutureResultMethods(interfaceClass)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-        private final T asynchronousProxy;
+    private static boolean hashFutureResultMethods(final Class interfaceClass) {
+        for (final Method method : interfaceClass.getDeclaredMethods()) {
+            if (method.getReturnType().equals(Future.class)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-        private SynchronousInvocationHandler(final T asynchronousProxy) {
+    @SuppressWarnings("unchecked")
+    private static <T> T unsafeCreateProxy(final T asynchronousProxy, final ClassLoader classLoader, final Class... proxyInterfaces) {
+        return (T) Proxy.newProxyInstance(
+                classLoader,
+                proxyInterfaces,
+                new SynchronousInvocationHandler(asynchronousProxy));
+    }
+
+    private static final class SynchronousInvocationHandler implements InvocationHandler {
+
+        private final Object asynchronousProxy;
+
+        private SynchronousInvocationHandler(final Object asynchronousProxy) {
             this.asynchronousProxy = asynchronousProxy;
         }
 
         @Override
         public Object invoke(Object proxy, Method method, Object... args) throws Throwable {
             if (!method.getReturnType().equals(Future.class)) {
-                throw new UnsupportedOperationException("");
+                throw new UnsupportedOperationException("Cannot transform to synchronous call if the result type is not Future");
             }
-            final Future<T> futureResult;
+            final Future futureResult;
             try {
-                //noinspection unchecked
-                futureResult = (Future<T>) method.invoke(asynchronousProxy, args);
+                futureResult = (Future) method.invoke(asynchronousProxy, args);
             } catch (InvocationTargetException e) {
                 throw e.getTargetException();
             }
-            final T result = Futures.getUnchecked(futureResult);
+            final Object result = Futures.getUnchecked(futureResult);
             return Futures.immediateFuture(result);
         }
     }
