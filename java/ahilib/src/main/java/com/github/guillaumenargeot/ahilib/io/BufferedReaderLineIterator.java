@@ -6,17 +6,20 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.NoSuchElementException;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 public final class BufferedReaderLineIterator extends AbstractIterator<String> {
 
     private final BufferedReader bufferedReader;
 
     public BufferedReaderLineIterator(final BufferedReader bufferedReader) {
+        checkArgument(bufferedReader != null, "buffered reader is null");
         this.bufferedReader = bufferedReader;
     }
 
 
     @Override
-    protected String computeNext() {
+    protected final String computeNext() {
         final String line;
         try {
             line = bufferedReader.readLine();
